@@ -84,6 +84,26 @@ def ls(domain):
     console.print(table)
 
 
+def get_record_info(name, record_type):
+    """Helper function to get zone and record information from a DNS name."""
+    parts = name.split(".")
+    if len(parts) < 2:
+        raise click.ClickException("Invalid DNS name format")
+
+    domain = ".".join(parts[-2:])
+    record_full_name = name if name.endswith(domain) else f"{name}.{domain}"
+
+    cf = get_cf_client()
+    zones = list(cf.zones.list(name=domain))
+    if not zones:
+        raise click.ClickException(f"Domain {domain} not found")
+
+    zone_id = zones[0].id
+    records = list(cf.dns.records.list(zone_id=zone_id, name=record_full_name, type=record_type))
+
+    return zone_id, record_full_name, records
+
+
 @main.command()
 @click.argument("record_type")
 @click.argument("name")
@@ -93,24 +113,15 @@ def ls(domain):
 def set(record_type, name, content, ttl, proxy):
     """Set a DNS record."""
     cf = get_cf_client()
+    zone_id, record_full_name, records = get_record_info(name, record_type)
 
-    # Extract domain from name and format the record name correctly
-    parts = name.split(".")
-    if len(parts) < 2:
-        raise click.ClickException("Invalid DNS name format")
-
-    domain = ".".join(parts[-2:])
-    full_name = name if name.endswith(domain) else f"{name}.{domain}"
-
-    zones = list(cf.zones.list(name=domain))
-    if not zones:
-        raise click.ClickException(f"Domain {domain} not found")
-    zone_id = zones[0].id
-
-    # Check if record exists
-    records = list(cf.dns.records.list(zone_id=zone_id, name=full_name, type=record_type))
-
-    data = {"zone_id": zone_id, "type": record_type, "name": full_name, "content": content, "ttl": parse_ttl(ttl)}
+    data = {
+        "zone_id": zone_id,
+        "type": record_type,
+        "name": record_full_name,
+        "content": content,
+        "ttl": parse_ttl(ttl),
+    }
     if proxy is not None:
         data["proxied"] = proxy
 
@@ -118,11 +129,11 @@ def set(record_type, name, content, ttl, proxy):
         # Update existing record
         data["dns_record_id"] = records[0].id
         cf.dns.records.update(**data)
-        console.print(f"[green]Updated {record_type} record for {full_name}[/green]")
+        console.print(f"[green]Updated {record_type} record for {record_full_name}[/green]")
     else:
         # Create new record
         cf.dns.records.create(**data)
-        console.print(f"[green]Created {record_type} record for {full_name}[/green]")
+        console.print(f"[green]Created {record_type} record for {record_full_name}[/green]")
 
 
 @main.command()
@@ -131,30 +142,15 @@ def set(record_type, name, content, ttl, proxy):
 def rm(record_type, name):
     """Remove a DNS record."""
     cf = get_cf_client()
-
-    # Extract domain from name and format the record name correctly
-    parts = name.split(".")
-    if len(parts) < 2:
-        raise click.ClickException("Invalid DNS name format")
-
-    domain = ".".join(parts[-2:])
-    record_name = name if name.endswith(domain) else f"{name}.{domain}"
-
-    zones = list(cf.zones.list(name=domain))
-    if not zones:
-        raise click.ClickException(f"Domain {domain} not found")
-    zone_id = zones[0].id
-
-    # Find and delete record
-    records = list(cf.dns.records.list(zone_id=zone_id, name=record_name, type=record_type))
+    zone_id, record_full_name, records = get_record_info(name, record_type)
 
     if not records:
-        console.print(f"[red]No {record_type} record found for {record_name}[/red]")
+        console.print(f"[red]No {record_type} record found for {record_full_name}[/red]")
         return
 
     record_id = records[0].id
     cf.dns.records.delete(zone_id=zone_id, dns_record_id=record_id)
-    console.print(f"[green]Deleted {record_type} record for {record_name}[/green]")
+    console.print(f"[green]Deleted {record_type} record for {record_full_name}[/green]")
 
 
 if __name__ == "__main__":
