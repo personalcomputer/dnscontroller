@@ -1,6 +1,6 @@
 [project]
 name = "dnscontroller"
-version = "0.4"
+version = "0.5"
 description = "A CLI tool for managing Cloudflare DNS records"
 readme = "README.md"
 authors = [
