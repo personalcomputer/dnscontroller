@@ -8,27 +8,42 @@ from rich.console import Console
 from rich.table import Table
 
 console = Console()
+_cf_client = None
 
 
-def load_config():
+def get_api_key():
+    """
+    Credit to https://github.com/danielpigott/cloudflare-cli for the config format specification this script piggybacks
+    on.
+    """
+    # First try to get API key from environment variable
+    api_key = os.environ.get("CF_API_KEY")
+    if api_key:
+        return api_key
+
+    # Fall back to config file
     config_path = os.path.expanduser("~/.cfcli.yml")
     if not os.path.exists(config_path):
         raise click.ClickException(
-            f"Configuration file not found at {config_path}. Please create it with your Cloudflare credentials."
+            f"API key missing. Please set CF_API_KEY environment variable or create {config_path} with your Cloudflare"
+            "credentials."
         )
 
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
     if not config.get("defaults", {}).get("token"):
-        raise click.ClickException("Cloudflare API token not found in configuration")
+        raise click.ClickException(f"Cloudflare API token not found in {config_path}")
 
-    return config["defaults"]
+    return config["defaults"]["token"]
 
 
 def get_cf_client():
-    config = load_config()
-    return Cloudflare(api_token=config["token"])
+    global _cf_client
+    if _cf_client is None:
+        api_key = get_api_key()
+        _cf_client = Cloudflare(api_token=api_key)
+    return _cf_client
 
 
 def parse_ttl(ttl_str):
@@ -84,17 +99,23 @@ def ls(domain, json_output):
                     }
                 )
             all_records.extend(domain_records)
-            console.print(json.dumps(all_records, indent=2))
         else:
             table = Table(title=f"DNS Records for {domain}")
             table.add_column("Type")
             table.add_column("Name")
             table.add_column("Content")
             table.add_column("TTL")
-
+            table.add_column("CF Proxy")
             for record in records:
-                table.add_row(record.type, record.name, record.content, str(record.ttl))
+                table.add_row(
+                    record.type, record.name, record.content, str(record.ttl), "On" if record.proxied else "Off"
+                )
             console.print(table)
+    if json_output:
+        if console.is_interactive:
+            console.print(json.dumps(all_records, indent=2))
+        else:
+            print(json.dumps(all_records, indent=2))
 
 
 def get_record_info(name, record_type):
