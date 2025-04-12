@@ -1,6 +1,10 @@
 # DNS Controller
 
-A command-line tool for managing DNS records via Cloudflare with a clean and intuitive interface.
+A minimal command-line tool for managing DNS records via Cloudflare with a clean and intuitive interface.
+
+For more powerful similar tools I recommend:
+- [cfcli](https://github.com/danielpigott/cloudflare-cli)
+- [dnscontrol](https://github.com/StackExchange/dnscontrol)
 
 
 ## Installation
