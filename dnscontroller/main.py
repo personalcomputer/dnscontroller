@@ -1,3 +1,4 @@
+import json
 import os
 
 import click
@@ -50,11 +51,18 @@ def main():
 
 @main.command()
 @click.argument("domain", required=False)
-def ls(domain):
+@click.option("--json", "json_output", is_flag=True, help="Output in JSON format")
+def ls(domain, json_output):
     """List DNS records. If domain is not specified, list all domains."""
     cf = get_cf_client()
 
     if domain:
+        domains = [domain]
+    else:
+        domains = (zone.name for zone in cf.zones.list())
+
+    all_records = []
+    for domain in domains:
         # List records for specific domain
         zones = list(cf.zones.list(name=domain))
         if not zones:
@@ -62,26 +70,31 @@ def ls(domain):
         zone_id = zones[0].id
         records = list(cf.dns.records.list(zone_id=zone_id))
 
-        table = Table(title=f"DNS Records for {domain}")
-        table.add_column("Type")
-        table.add_column("Name")
-        table.add_column("Content")
-        table.add_column("TTL")
+        if json_output:
+            domain_records = []
+            for record in records:
+                domain_records.append(
+                    {
+                        "type": record.type,
+                        "name": record.name,
+                        "content": record.content,
+                        "ttl": record.ttl,
+                        "proxied": record.proxied,
+                        "domain": domain,
+                    }
+                )
+            all_records.extend(domain_records)
+            console.print(json.dumps(all_records, indent=2))
+        else:
+            table = Table(title=f"DNS Records for {domain}")
+            table.add_column("Type")
+            table.add_column("Name")
+            table.add_column("Content")
+            table.add_column("TTL")
 
-        for record in records:
-            table.add_row(record.type, record.name, record.content, str(record.ttl))
-    else:
-        # List all domains
-        zones = list(cf.zones.list())
-
-        table = Table(title="Available Domains")
-        table.add_column("Domain")
-        table.add_column("Status")
-
-        for zone in zones:
-            table.add_row(zone.name, zone.status)
-
-    console.print(table)
+            for record in records:
+                table.add_row(record.type, record.name, record.content, str(record.ttl))
+            console.print(table)
 
 
 def get_record_info(name, record_type):
