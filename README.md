@@ -1,4 +1,4 @@
-# DNS Controller
+# dnscontroller
 
 A minimal command-line tool for managing DNS records via Cloudflare with a clean and intuitive interface.
 

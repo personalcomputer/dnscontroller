@@ -1,7 +1,7 @@
 import json
 import os
 
-import click
+import rich_click as click
 import yaml
 from cloudflare import Cloudflare
 from rich.console import Console
@@ -25,7 +25,7 @@ def get_api_key():
     config_path = os.path.expanduser("~/.cfcli.yml")
     if not os.path.exists(config_path):
         raise click.ClickException(
-            f"API key missing. Please set CF_API_KEY environment variable or create {config_path} with your Cloudflare"
+            f"API key missing. Please set CF_API_KEY environment variable or create {config_path} with your Cloudflare "
             "credentials."
         )
 
@@ -41,8 +41,7 @@ def get_api_key():
 def get_cf_client():
     global _cf_client
     if _cf_client is None:
-        api_key = get_api_key()
-        _cf_client = Cloudflare(api_token=api_key)
+        _cf_client = Cloudflare(api_token=get_api_key())
     return _cf_client
 
 
@@ -60,7 +59,7 @@ def parse_ttl(ttl_str):
 
 @click.group()
 def main():
-    """DNS Controller - Manage DNS records via Cloudflare"""
+    """dnscontroller - Manage DNS records in Cloudflare"""
     pass
 
 
@@ -68,7 +67,7 @@ def main():
 @click.argument("domain", required=False)
 @click.option("--json", "json_output", is_flag=True, help="Output in JSON format")
 def ls(domain, json_output):
-    """List DNS records. If domain is not specified, list all domains."""
+    """List DNS records. If domain is not specified, list from all domains."""
     cf = get_cf_client()
 
     if domain:
@@ -78,10 +77,9 @@ def ls(domain, json_output):
 
     all_records = []
     for domain in domains:
-        # List records for specific domain
         zones = list(cf.zones.list(name=domain))
         if not zones:
-            raise click.ClickException(f"Domain {domain} not found")
+            raise click.ClickException(f'Domain (zone) "{domain}" not found')
         zone_id = zones[0].id
         records = list(cf.dns.records.list(zone_id=zone_id))
 
@@ -119,7 +117,6 @@ def ls(domain, json_output):
 
 
 def get_record_info(name, record_type):
-    """Helper function to get zone and record information from a DNS name."""
     parts = name.split(".")
     if len(parts) < 2:
         raise click.ClickException("Invalid DNS name format")
@@ -130,7 +127,7 @@ def get_record_info(name, record_type):
     cf = get_cf_client()
     zones = list(cf.zones.list(name=domain))
     if not zones:
-        raise click.ClickException(f"Domain {domain} not found")
+        raise click.ClickException(f'Domain (zone) "{domain}" not found')
 
     zone_id = zones[0].id
     records = list(cf.dns.records.list(zone_id=zone_id, name=record_full_name, type=record_type))
@@ -145,7 +142,7 @@ def get_record_info(name, record_type):
 @click.option("--ttl", default="auto", help="TTL value (e.g. 300, 5min, 1h, 1d, auto)")
 @click.option("--proxy/--no-proxy", default=None, help="Enable/disable Cloudflare proxy for this record")
 def set(record_type, name, content, ttl, proxy):
-    """Set a DNS record."""
+    """Set a DNS record. UPSERT semantics."""
     cf = get_cf_client()
     zone_id, record_full_name, records = get_record_info(name, record_type)
 

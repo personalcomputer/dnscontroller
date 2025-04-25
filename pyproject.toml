@@ -11,6 +11,7 @@ dependencies = [
     "rich>=13.7.0",
     "cloudflare>=2.12.0",
     "pyyaml>=6.0.1",
+    "rich-click>=1.8.8",
 ]
 requires-python = ">=3.11"
 
@@ -40,6 +41,11 @@ dev = [
     "isort",
     "ruff",
     "ipdb",
+]
+
+[tool.hatch.build]
+only-include = [
+    "dnscontroller",
 ]
 
 [tool.ruff]

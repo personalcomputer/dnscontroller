@@ -15,7 +15,7 @@ def test_cli_help():
     runner = CliRunner()
     result = runner.invoke(main, ["--help"])
     assert result.exit_code == 0
-    assert "DNS Controller - Manage DNS records via Cloudflare" in result.output
+    assert "dnscontroller" in result.output
 
     result = runner.invoke(main, ["ls", "--help"])
     assert result.exit_code == 0
